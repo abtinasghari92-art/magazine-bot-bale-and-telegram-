@@ -22,26 +22,42 @@ enum AdminStatus {
   DISABLED
 }
 
-/// End-user of the storefront. Profile fields arrive on Day 2.
+/// End-user of the storefront. Profile lives here; messenger identity lives on UserIdentity.
 model User {
-  id        String     @id @default(cuid())
-  status    UserStatus @default(ACTIVE)
-  createdAt DateTime   @default(now())
-  updatedAt DateTime   @updatedAt
+  id              String     @id @default(cuid())
+  status          UserStatus @default(ACTIVE)
+  firstName       String?
+  lastName        String?
+  phone           String?
+  phoneVerifiedAt DateTime?
+  lastSeenAt      DateTime?
+  createdAt       DateTime   @default(now())
+  updatedAt       DateTime   @updatedAt
 
-  identities    UserIdentity[]
-  entrySessions EntrySession[]
+  identities         UserIdentity[]
+  entrySessions      EntrySession[]
+  addresses          Address[]
+  phoneVerifications PhoneVerification[]
+
+  @@index([phone])
 }
 
 /// One messenger account per channel. Never store bot tokens here.
+/// Name/username/language are the messenger's own values, kept separate from the editable profile.
 model UserIdentity {
-  id              String            @id @default(cuid())
+  id              String           @id @default(cuid())
   userId          String
-  user            User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user            User             @relation(fields: [userId], references: [id], onDelete: Cascade)
   channel         MessengerChannel
   messengerUserId String
-  createdAt       DateTime          @default(now())
-  updatedAt       DateTime          @updatedAt
+  username        String?
+  firstName       String?
+  lastName        String?
+  languageCode    String?
+  startParam      String?
+  lastSeenAt      DateTime?
+  createdAt       DateTime         @default(now())
+  updatedAt       DateTime         @updatedAt
 
   @@unique([channel, messengerUserId])
   @@index([userId])
@@ -109,4 +125,53 @@ model AnalyticsEvent {
   @@index([sessionId])
   @@index([source])
   @@index([userId])
+}
+
+enum PhoneVerificationStatus {
+  PENDING
+  VERIFIED
+  EXPIRED
+  FAILED
+}
+
+/// Postal address owned by a single user (REQ-021). Rows are deactivated, never hard-deleted.
+model Address {
+  id              String    @id @default(cuid())
+  userId          String
+  user            User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  label           String?
+  recipientName   String
+  recipientMobile String
+  province        String
+  city            String
+  addressLine     String
+  postalCode      String
+  isDefault       Boolean   @default(false)
+  isActive        Boolean   @default(true)
+  deactivatedAt   DateTime?
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  @@index([userId])
+  @@index([userId, isActive])
+  @@index([userId, isDefault])
+}
+
+/// One mobile-verification attempt (REQ-018). Only a hash of the code is stored.
+model PhoneVerification {
+  id         String                  @id @default(cuid())
+  userId     String
+  user       User                    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  phone      String
+  codeHash   String
+  provider   String
+  status     PhoneVerificationStatus @default(PENDING)
+  attempts   Int                     @default(0)
+  expiresAt  DateTime
+  consumedAt DateTime?
+  createdAt  DateTime                @default(now())
+  updatedAt  DateTime                @updatedAt
+
+  @@index([userId, status])
+  @@index([expiresAt])
 }

@@ -1,19 +1,101 @@
 @import "tailwindcss";
 
+/*
+ * Theme tokens (REQ-001 / REQ-006).
+ *
+ * Inside Telegram the client injects `--tg-theme-*` variables and they win.
+ * Outside Telegram — or on a client that does not inject them (DEC-022) — the
+ * `--fallback-*` values apply: a readable light theme by default, dark when the
+ * Telegram color scheme or the OS asks for it.
+ */
 :root {
-  --background: #fafafa;
-  --foreground: #18181b;
+  --fallback-bg: #f2f2f7;
+  --fallback-surface: #ffffff;
+  --fallback-text: #18181b;
+  --fallback-muted: #6b7280;
+  --fallback-link: #2563eb;
+  --fallback-button: #2563eb;
+  --fallback-button-text: #ffffff;
+  --fallback-border: #e4e4e7;
+  --fallback-danger: #dc2626;
+
+  --app-bg: var(--tg-theme-secondary-bg-color, var(--fallback-bg));
+  --app-surface: var(--tg-theme-section-bg-color, var(--tg-theme-bg-color, var(--fallback-surface)));
+  --app-text: var(--tg-theme-text-color, var(--fallback-text));
+  --app-muted: var(--tg-theme-hint-color, var(--fallback-muted));
+  --app-link: var(--tg-theme-link-color, var(--fallback-link));
+  --app-button: var(--tg-theme-button-color, var(--fallback-button));
+  --app-button-text: var(--tg-theme-button-text-color, var(--fallback-button-text));
+  --app-border: var(--fallback-border);
+  --app-danger: var(--tg-theme-destructive-text-color, var(--fallback-danger));
+
+  --background: var(--app-bg);
+  --foreground: var(--app-text);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-tg-scheme="light"]) {
+    --fallback-bg: #17212b;
+    --fallback-surface: #232e3c;
+    --fallback-text: #f5f5f5;
+    --fallback-muted: #9aa4b0;
+    --fallback-link: #6ab3f3;
+    --fallback-button: #3390ec;
+    --fallback-button-text: #ffffff;
+    --fallback-border: #33455a;
+    --fallback-danger: #ff595a;
+  }
+}
+
+:root[data-tg-scheme="dark"] {
+  --fallback-bg: #17212b;
+  --fallback-surface: #232e3c;
+  --fallback-text: #f5f5f5;
+  --fallback-muted: #9aa4b0;
+  --fallback-link: #6ab3f3;
+  --fallback-button: #3390ec;
+  --fallback-button-text: #ffffff;
+  --fallback-border: #33455a;
+  --fallback-danger: #ff595a;
 }
 
 @theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
+  --color-background: var(--app-bg);
+  --color-foreground: var(--app-text);
+  --color-surface: var(--app-surface);
+  --color-muted: var(--app-muted);
+  --color-link: var(--app-link);
+  --color-button: var(--app-button);
+  --color-button-text: var(--app-button-text);
+  --color-border-subtle: var(--app-border);
+  --color-danger: var(--app-danger);
   --font-sans: var(--font-vazirmatn), "Tahoma", ui-sans-serif, system-ui, sans-serif;
 }
 
 body {
-  background: var(--background);
-  color: var(--foreground);
+  background: var(--app-bg);
+  color: var(--app-text);
   font-family: var(--font-sans);
   line-height: 1.7;
+  /* Telegram WebView: keep the page from bouncing/zooming like a browser page. */
+  overscroll-behavior-y: none;
+  -webkit-text-size-adjust: 100%;
+}
+
+/* Native-feeling inputs inside the Telegram WebView. */
+input,
+textarea,
+select,
+button {
+  font-family: inherit;
+  font-size: 1rem;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+  }
 }
