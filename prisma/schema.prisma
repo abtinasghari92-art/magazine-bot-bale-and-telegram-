@@ -1,0 +1,112 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum MessengerChannel {
+  TELEGRAM
+  BALE
+}
+
+enum UserStatus {
+  ACTIVE
+  DISABLED
+}
+
+enum AdminStatus {
+  ACTIVE
+  DISABLED
+}
+
+/// End-user of the storefront. Profile fields arrive on Day 2.
+model User {
+  id        String     @id @default(cuid())
+  status    UserStatus @default(ACTIVE)
+  createdAt DateTime   @default(now())
+  updatedAt DateTime   @updatedAt
+
+  identities    UserIdentity[]
+  entrySessions EntrySession[]
+}
+
+/// One messenger account per channel. Never store bot tokens here.
+model UserIdentity {
+  id              String            @id @default(cuid())
+  userId          String
+  user            User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+  channel         MessengerChannel
+  messengerUserId String
+  createdAt       DateTime          @default(now())
+  updatedAt       DateTime          @updatedAt
+
+  @@unique([channel, messengerUserId])
+  @@index([userId])
+}
+
+/// Attribution session: channel, messenger user id, source, Deep Link/start param.
+model EntrySession {
+  id              String             @id @default(cuid())
+  userId          String?
+  user            User?              @relation(fields: [userId], references: [id], onDelete: SetNull)
+  channel         MessengerChannel?
+  messengerUserId String?
+  source          String?
+  startParam      String?
+  createdAt       DateTime           @default(now())
+  updatedAt       DateTime           @updatedAt
+
+  @@index([userId])
+  @@index([channel, messengerUserId])
+  @@index([source])
+  @@index([createdAt])
+}
+
+/// Staff operator row. Authentication is Day 3 — no password/session here yet.
+model AdminUser {
+  id        String      @id @default(cuid())
+  email     String      @unique
+  status    AdminStatus @default(ACTIVE)
+  createdAt DateTime    @default(now())
+  updatedAt DateTime    @updatedAt
+}
+
+/// Foundation for later admin audit (REQ-068). No writers on Day 1.
+model AuditEvent {
+  id         String   @id @default(cuid())
+  actorType  String
+  actorId    String?
+  action     String
+  targetType String?
+  targetId   String?
+  metadata   Json?
+  createdAt  DateTime @default(now())
+
+  @@index([actorId])
+  @@index([action])
+  @@index([createdAt])
+}
+
+/// Foundation for later funnel/analytics (REQ-003 / REQ-053). No Telegram parser on Day 1.
+model AnalyticsEvent {
+  id              String             @id @default(cuid())
+  name            String
+  channel         MessengerChannel?
+  messengerUserId String?
+  source          String?
+  startParam      String?
+  sessionId       String?
+  userId          String?
+  occurredAt      DateTime           @default(now())
+  createdAt       DateTime           @default(now())
+  metadata        Json?
+
+  @@index([name, occurredAt])
+  @@index([channel, messengerUserId])
+  @@index([sessionId])
+  @@index([source])
+  @@index([userId])
+}
