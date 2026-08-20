@@ -43,7 +43,7 @@ No SMS vendor is selected yet (DEC-003) and the OTP policy is unsigned (DEC-011)
 
 ## Local setup
 
-Requirements: Node.js 20.19+ (22.13+ recommended) and a PostgreSQL instance when you are ready to migrate.
+Requirements: Node.js **20.x** (Liara: set `next.nodeVersion` to `"20"` in `liara.json` or pick Node 20 in the console). Node 22 on Liara has known `npm ci` crashes.
 
 ```bash
 npm install
