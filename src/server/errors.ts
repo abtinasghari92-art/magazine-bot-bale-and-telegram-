@@ -1,27 +1,15 @@
 import "server-only";
 
-import { logger } from "@/lib/logger";
-import { ValidationError } from "@/lib/validation";
-import { getAppEnvironment } from "@/lib/env";
+import { mapErrorToApiResponse } from "@/server/error-mapping";
 
+/**
+ * Legacy helper kept for non-`NextResponse` callers. It shares one mapping with
+ * `jsonError`, so neither path can start leaking internals independently.
+ */
 export function toPublicErrorResponse(error: unknown): {
   status: number;
-  body: { error: string };
+  body: { error: string; code: string };
 } {
-  if (error instanceof ValidationError) {
-    return {
-      status: error.status,
-      body: { error: error.message },
-    };
-  }
-
-  logger.error("Unhandled server error", error);
-
-  const expose = getAppEnvironment() !== "production";
-  return {
-    status: 500,
-    body: {
-      error: expose && error instanceof Error ? error.message : "Internal server error",
-    },
-  };
+  const { status, body } = mapErrorToApiResponse(error);
+  return { status, body: { error: body.error, code: body.code } };
 }

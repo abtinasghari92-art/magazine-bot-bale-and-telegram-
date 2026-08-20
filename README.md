@@ -41,6 +41,85 @@ No SMS vendor is selected yet (DEC-003) and the OTP policy is unsigned (DEC-011)
 - `PHONE_VERIFICATION_PROVIDER` defaults to `log` in development/test and `none` everywhere else. `none` refuses to send; `log` is rejected outright in production.
 - Codes are stored salted-hashed, never in clear text, and never returned by the API.
 
+## Admin panel (Day 3)
+
+Catalog management lives at `/admin`, behind a server-checked session cookie.
+
+| Route | Purpose |
+| --- | --- |
+| `/admin/login` | Sign in. No self-registration exists. |
+| `/admin` | Current issue and recent activity |
+| `/admin/issues` | List, search, publish/unpublish, set current, archive |
+| `/admin/issues/new` | Create an issue |
+| `/admin/issues/[id]` | Edit an issue; upload cover and preview PDF |
+
+### Creating the first admin
+
+Accounts are created only from a shell on the server — there is no HTTP route
+that can create one:
+
+```bash
+npm run admin:create -- --email you@example.com
+```
+
+The command prompts for the password with echo off, so it never reaches shell
+history or a log. For an unattended first deploy, set `ADMIN_PASSWORD` for that
+single run from the host's secret store. **Never put an admin password in git.**
+
+To rotate a password (this also revokes every active session for that admin):
+
+```bash
+npm run admin:create -- --email you@example.com --reset-password
+```
+
+## Magazine catalog (Day 3)
+
+Public Mini App routes:
+
+| Route | Purpose |
+| --- | --- |
+| `/miniapp` | Current/latest published issue with a quick-purchase entry |
+| `/miniapp/archive` | Grid, search and year/season/topic filters, cursor paging |
+| `/miniapp/issues/[slug]` | Issue detail and the PDF preview entry |
+| `/miniapp/purchase/[slug]` | Purchase entry point — Cart and checkout are Day 4 |
+
+Only **published** issues are reachable publicly. A draft or archived slug
+answers 404 with the same body a missing slug gets, so guessing a URL cannot
+confirm that unpublished content exists.
+
+### PDF preview — unresolved product decisions
+
+`DEC-006` (preview page count) and `DEC-007` (watermark format) are **not
+signed by the client**. The values in `.env.example` are contractor development
+defaults so the feature could be built and tested:
+
+- `PREVIEW_PAGE_LIMIT=3`
+- watermark text `پیش‌نمایش` plus the issue number
+
+These are **temporary** and must not appear in handover as something the client
+ordered. A per-issue override (`previewPageLimit`) exists so a decision can be
+applied globally or per issue without a code change.
+
+The preview is built server-side: the allowed pages are copied into a brand-new
+document, each one watermarked, and only that document is sent. The stored file
+has no public URL at any point, so hiding pages in the viewer is never what
+enforces the limit. Signed, expiring URLs (`REQ-071`) harden the transport on
+Day 6; they do not replace this limit.
+
+### Object Storage
+
+Covers and preview PDFs are stored as objects; PostgreSQL holds only metadata
+and the object key. Provider selection (`OBJECT_STORAGE_PROVIDER=auto`):
+
+| Environment | Credentials present | Adapter |
+| --- | --- | --- |
+| any | yes | S3-compatible (Liara Object Storage) |
+| development / test | no | local folder under `.data/` (git-ignored) |
+| staging / production | no | **refuses uploads** |
+
+The last row is deliberate: a production upload fails loudly rather than
+landing on a container disk that the next deploy erases.
+
 ## Local setup
 
 Requirements: Node.js **20.x** (Liara: set `next.nodeVersion` to `"20"` in `liara.json` or pick Node 20 in the console). Node 22 on Liara has known `npm ci` crashes.
@@ -90,6 +169,7 @@ If `DATABASE_URL` is missing, generate/validate can still run with the variable 
 | `npm run prisma:migrate` | Create/apply migrations (dev) |
 | `npm run prisma:migrate:deploy` | Apply migrations (production) |
 | `npm test` | Vitest suite (DB-backed tests run only with `TEST_DATABASE_URL`) |
+| `npm run admin:create` | Create or re-password the first admin (see above) |
 
 ## Liara
 
@@ -146,3 +226,7 @@ grep -c '"resolved"' package-lock.json && grep -c 'linux-x64-gnu' package-lock.j
 - Prisma parameterized queries; no messenger bot tokens on `User` rows.
 - Telegram `initData` is verified server-side (HMAC-SHA256 over the data-check-string with `HMAC("WebAppData", botToken)` as the key) and `auth_date` freshness is enforced. Client-supplied Telegram user data is never trusted.
 - Every profile/address operation is scoped to the authenticated user; another user's address reports as "not found" rather than "forbidden".
+- No internal error ever reaches the browser. Every thrown value passes through `src/server/error-mapping.ts`, which returns a Persian sentence and a stable code; Prisma messages, SQL, connection details and stack traces stay in the server log, correlated by a short `errorId`. `tests/error-disclosure.test.ts` guards this.
+- Admin sessions: the cookie carries 32 random bytes and the database stores only its SHA-256, so a database dump yields nothing usable. Cookies are `HttpOnly`, `SameSite=Lax`, and `Secure` on staging and production.
+- Admin login answers every failure identically and always runs the password comparison, so it neither confirms which emails exist nor leaks the answer through timing. Repeated failures are throttled per email and per hashed client address.
+- Object storage keys are generated server-side and never sent to or accepted from a browser: a client asks for an *issue*, and the server resolves the key. Uploaded files are identified by their magic number, not the browser's `Content-Type`.

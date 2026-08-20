@@ -12,6 +12,21 @@ const eslintConfig = defineConfig([
     "next-env.d.ts",
     "prisma/migrations/**",
   ]),
+  {
+    rules: {
+      // An adapter that implements a port keeps the port's full signature even
+      // when it ignores an argument, so the call site stays type-checked. The
+      // leading underscore marks that as deliberate.
+      "@typescript-eslint/no-unused-vars": [
+        "warn",
+        {
+          argsIgnorePattern: "^_",
+          varsIgnorePattern: "^_",
+          caughtErrorsIgnorePattern: "^_",
+        },
+      ],
+    },
+  },
 ]);
 
 export default eslintConfig;

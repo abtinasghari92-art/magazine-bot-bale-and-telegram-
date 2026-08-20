@@ -41,6 +41,52 @@ export function getWebApp(): TelegramWebApp | null {
   return window.Telegram?.WebApp ?? null;
 }
 
+let webAppShellInitialized = false;
+
+/**
+ * Temporary safe diagnostics for Mini App bootstrap (never logs initData or user data).
+ */
+export function logTelegramWebAppDiagnostics(): void {
+  if (typeof window === "undefined") return;
+
+  const webApp = window.Telegram?.WebApp;
+  console.info("[miniapp:tma] bootstrap", {
+    hasTelegram: Boolean(window.Telegram),
+    hasWebApp: Boolean(webApp),
+    hasInitData: Boolean(webApp?.initData?.trim()),
+    version: webApp?.version ?? "(none)",
+    platform: webApp?.platform ?? "(none)",
+  });
+}
+
+/**
+ * Signal Telegram that the Mini App shell is mounted. Must run before session API work
+ * so Telegram hides its native loading placeholder.
+ */
+export function initializeTelegramWebApp(): boolean {
+  if (typeof window === "undefined") return false;
+
+  logTelegramWebAppDiagnostics();
+
+  const app = getWebApp();
+  if (!app) return false;
+
+  applyTelegramTheme(app);
+
+  if (!webAppShellInitialized) {
+    app.ready();
+    app.expand?.();
+    webAppShellInitialized = true;
+  }
+
+  return true;
+}
+
+/** Reset bootstrap state for unit tests. */
+export function resetTelegramWebAppInitializationForTests(): void {
+  webAppShellInitialized = false;
+}
+
 /** Wait for `telegram-web-app.js` to attach itself, or give up. */
 export function waitForWebApp(timeoutMs = 4000): Promise<TelegramWebApp | null> {
   return new Promise((resolve) => {
@@ -99,4 +145,20 @@ export function readInitData(): string | null {
   if (typeof window === "undefined") return null;
   const fromQuery = new URLSearchParams(window.location.search).get("initData");
   return fromQuery?.trim() || null;
+}
+
+/**
+ * Attach init data to a URL the browser will load as a *document* — a cover
+ * `<img src>` or a preview PDF in a new tab. Those requests cannot carry the
+ * `Authorization` header `apiFetch` uses, and the matching server routes opt in
+ * to reading the query parameter.
+ *
+ * Returns the URL unchanged when there is no init data, so the caller still
+ * gets a well-formed link and the server does the rejecting.
+ */
+export function withInitData(url: string): string {
+  const initData = readInitData();
+  if (!initData) return url;
+  const separator = url.includes("?") ? "&" : "?";
+  return `${url}${separator}initData=${encodeURIComponent(initData)}`;
 }

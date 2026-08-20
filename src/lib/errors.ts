@@ -37,9 +37,17 @@ export class AppError extends Error {
 }
 
 export class UnauthorizedError extends AppError {
-  constructor(internalMessage?: string) {
-    super("unauthorized", "احراز هویت تلگرام معتبر نیست.", internalMessage);
+  constructor(internalMessage?: string, publicMessage = "احراز هویت تلگرام معتبر نیست.") {
+    super("unauthorized", publicMessage, internalMessage);
     this.name = "UnauthorizedError";
+  }
+}
+
+/** 401 for the admin panel. The Mini App wording would confuse a staff user. */
+export class AdminUnauthorizedError extends UnauthorizedError {
+  constructor(internalMessage?: string) {
+    super(internalMessage, "نشست مدیریت معتبر نیست. دوباره وارد شوید.");
+    this.name = "AdminUnauthorizedError";
   }
 }
 

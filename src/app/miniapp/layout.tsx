@@ -1,9 +1,9 @@
 import type { Metadata, Viewport } from "next";
-import Script from "next/script";
 import type { ReactNode } from "react";
 
 import { AppFrame } from "@/components/miniapp/AppFrame";
 import { MiniAppProvider } from "@/components/miniapp/MiniAppProvider";
+import { TelegramWebAppBootstrap } from "@/components/miniapp/TelegramWebAppBootstrap";
 
 export const metadata: Metadata = {
   title: "سامانه مجله | مینی‌اپ",
@@ -22,8 +22,7 @@ export const viewport: Viewport = {
 export default function MiniAppLayout({ children }: { children: ReactNode }) {
   return (
     <>
-      {/* Telegram's WebApp bridge. The provider waits for it before calling the API. */}
-      <Script src="https://telegram.org/js/telegram-web-app.js" strategy="afterInteractive" />
+      <TelegramWebAppBootstrap />
       <MiniAppProvider>
         <AppFrame>{children}</AppFrame>
       </MiniAppProvider>

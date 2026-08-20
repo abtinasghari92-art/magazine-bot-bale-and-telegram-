@@ -1,4 +1,4 @@
-import { z, type ZodType } from "zod";
+import { z, type ZodTypeAny } from "zod";
 
 export type FieldIssue = {
   field: string;
@@ -28,7 +28,14 @@ export class FieldValidationError extends Error {
   }
 }
 
-export function parseWithSchema<T>(schema: ZodType<T>, input: unknown): T {
+/**
+ * Parse `input`, or throw `ValidationError`.
+ *
+ * The return type is the schema's **output**, so a schema that coerces (say a
+ * query string into a number) reports the coerced type rather than the raw
+ * input shape.
+ */
+export function parseWithSchema<S extends ZodTypeAny>(schema: S, input: unknown): z.output<S> {
   const result = schema.safeParse(input);
   if (!result.success) {
     throw new ValidationError(result.error.issues);

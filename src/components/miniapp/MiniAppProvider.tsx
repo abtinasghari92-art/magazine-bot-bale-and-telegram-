@@ -66,8 +66,6 @@ export function MiniAppProvider({ children }: { children: ReactNode }) {
       applyTelegramTheme(app);
 
       if (app) {
-        app.ready();
-        app.expand?.();
         // Keep Telegram colours in sync when the user switches theme (REQ-006).
         const handler = () => applyTelegramTheme(app);
         themeHandlerRef.current = handler;

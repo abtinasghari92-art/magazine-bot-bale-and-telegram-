@@ -2,21 +2,10 @@ import "server-only";
 
 import { NextResponse } from "next/server";
 
-import { AppError } from "@/lib/errors";
-import { getAppEnvironment } from "@/lib/env";
-import { logger } from "@/lib/logger";
-import {
-  FieldValidationError,
-  ValidationError,
-  toFieldIssues,
-  type FieldIssue,
-} from "@/lib/validation";
+import { FieldValidationError } from "@/lib/validation";
+import { mapErrorToApiResponse, type ApiErrorBody } from "@/server/error-mapping";
 
-export type ApiErrorBody = {
-  error: string;
-  code: string;
-  issues?: FieldIssue[];
-};
+export type { ApiErrorBody };
 
 /** Responses to a Mini App WebView are per-user and must never be cached. */
 const NO_STORE = { "Cache-Control": "no-store" } as const;
@@ -27,46 +16,11 @@ export function jsonOk<T extends object>(body: T, status = 200): NextResponse {
 
 /**
  * Map any thrown value to a safe response. Internal messages, stack traces and
- * Prisma details never cross this boundary in production.
+ * Prisma details never cross this boundary — see `server/error-mapping.ts`.
  */
 export function jsonError(error: unknown): NextResponse<ApiErrorBody> {
-  if (error instanceof FieldValidationError) {
-    return NextResponse.json(
-      { error: "اطلاعات واردشده معتبر نیست.", code: "invalid_request", issues: error.issues },
-      { status: error.status, headers: NO_STORE },
-    );
-  }
-
-  if (error instanceof ValidationError) {
-    return NextResponse.json(
-      {
-        error: "اطلاعات واردشده معتبر نیست.",
-        code: "invalid_request",
-        issues: toFieldIssues(error.details),
-      },
-      { status: error.status, headers: NO_STORE },
-    );
-  }
-
-  if (error instanceof AppError) {
-    if (error.status >= 500) {
-      logger.error("Request failed", error);
-    }
-    return NextResponse.json(
-      { error: error.publicMessage, code: error.code },
-      { status: error.status, headers: NO_STORE },
-    );
-  }
-
-  logger.error("Unhandled request error", error);
-  const expose = getAppEnvironment() !== "production";
-  return NextResponse.json(
-    {
-      error: expose && error instanceof Error ? error.message : "خطای داخلی سامانه.",
-      code: "internal_error",
-    },
-    { status: 500, headers: NO_STORE },
-  );
+  const { status, body } = mapErrorToApiResponse(error);
+  return NextResponse.json(body, { status, headers: NO_STORE });
 }
 
 /** Parse a JSON body, returning `{}` for an empty one and rejecting garbage. */

@@ -36,6 +36,9 @@ yarn-error.log*
 .env.development
 !.env.example
 
+# local Object Storage development adapter (never in git, never in production)
+/.data/
+
 # liara local
 .liara.json.bak
 

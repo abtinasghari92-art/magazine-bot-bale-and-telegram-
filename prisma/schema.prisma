@@ -65,15 +65,15 @@ model UserIdentity {
 
 /// Attribution session: channel, messenger user id, source, Deep Link/start param.
 model EntrySession {
-  id              String             @id @default(cuid())
+  id              String            @id @default(cuid())
   userId          String?
-  user            User?              @relation(fields: [userId], references: [id], onDelete: SetNull)
+  user            User?             @relation(fields: [userId], references: [id], onDelete: SetNull)
   channel         MessengerChannel?
   messengerUserId String?
   source          String?
   startParam      String?
-  createdAt       DateTime           @default(now())
-  updatedAt       DateTime           @updatedAt
+  createdAt       DateTime          @default(now())
+  updatedAt       DateTime          @updatedAt
 
   @@index([userId])
   @@index([channel, messengerUserId])
@@ -81,13 +81,51 @@ model EntrySession {
   @@index([createdAt])
 }
 
-/// Staff operator row. Authentication is Day 3 — no password/session here yet.
+/// Staff operator (REQ-046). Password hashing is bcrypt; no self-registration exists.
+/// Roles and permissions are Day 7 (REQ-067) and deliberately absent here.
 model AdminUser {
-  id        String      @id @default(cuid())
-  email     String      @unique
-  status    AdminStatus @default(ACTIVE)
-  createdAt DateTime    @default(now())
-  updatedAt DateTime    @updatedAt
+  id           String      @id @default(cuid())
+  email        String      @unique
+  name         String?
+  passwordHash String?
+  status       AdminStatus @default(ACTIVE)
+  lastLoginAt  DateTime?
+  createdAt    DateTime    @default(now())
+  updatedAt    DateTime    @updatedAt
+
+  sessions AdminSession[]
+}
+
+/// Server-side admin session (REQ-046 / REQ-070).
+/// The cookie carries an opaque token; only its SHA-256 hash is stored.
+model AdminSession {
+  id          String    @id @default(cuid())
+  adminUserId String
+  adminUser   AdminUser @relation(fields: [adminUserId], references: [id], onDelete: Cascade)
+  tokenHash   String    @unique
+  expiresAt   DateTime
+  lastUsedAt  DateTime  @default(now())
+  revokedAt   DateTime?
+  ipHash      String?
+  userAgent   String?
+  createdAt   DateTime  @default(now())
+
+  @@index([adminUserId])
+  @@index([expiresAt])
+}
+
+/// Login attempt ledger used for brute-force throttling (REQ-070).
+/// Stores the normalized email and a hashed client address, never a password.
+model AdminLoginAttempt {
+  id         String   @id @default(cuid())
+  email      String
+  ipHash     String?
+  successful Boolean  @default(false)
+  createdAt  DateTime @default(now())
+
+  @@index([email, createdAt])
+  @@index([ipHash, createdAt])
+  @@index([createdAt])
 }
 
 /// Foundation for later admin audit (REQ-068). No writers on Day 1.
@@ -108,7 +146,7 @@ model AuditEvent {
 
 /// Foundation for later funnel/analytics (REQ-003 / REQ-053). No Telegram parser on Day 1.
 model AnalyticsEvent {
-  id              String             @id @default(cuid())
+  id              String            @id @default(cuid())
   name            String
   channel         MessengerChannel?
   messengerUserId String?
@@ -116,8 +154,8 @@ model AnalyticsEvent {
   startParam      String?
   sessionId       String?
   userId          String?
-  occurredAt      DateTime           @default(now())
-  createdAt       DateTime           @default(now())
+  occurredAt      DateTime          @default(now())
+  createdAt       DateTime          @default(now())
   metadata        Json?
 
   @@index([name, occurredAt])
@@ -174,4 +212,102 @@ model PhoneVerification {
 
   @@index([userId, status])
   @@index([expiresAt])
+}
+
+enum IssueStatus {
+  DRAFT
+  PUBLISHED
+  ARCHIVED
+}
+
+enum IssueSeason {
+  SPRING
+  SUMMER
+  AUTUMN
+  WINTER
+}
+
+enum MediaAssetKind {
+  ISSUE_COVER
+  ISSUE_PREVIEW_PDF
+  ISSUE_DIGITAL_PDF
+}
+
+/// Metadata for one object in Object Storage (REQ-014 / REQ-048).
+/// PostgreSQL never holds the bytes — only the provider, bucket and object key
+/// needed to reach them. Object keys are server-side identifiers and are never
+/// accepted from, or exposed to, a browser.
+model MediaAsset {
+  id               String         @id @default(cuid())
+  kind             MediaAssetKind
+  provider         String
+  bucket           String?
+  objectKey        String         @unique
+  contentType      String
+  sizeBytes        Int
+  checksum         String?
+  originalFilename String?
+  width            Int?
+  height           Int?
+  /// Total pages in a stored PDF. The preview endpoint never serves more than
+  /// the configured limit regardless of this value.
+  pageCount        Int?
+  metadata         Json?
+  createdAt        DateTime       @default(now())
+  updatedAt        DateTime       @updatedAt
+
+  coverOf   MagazineIssue[] @relation("IssueCover")
+  previewOf MagazineIssue[] @relation("IssuePreviewPdf")
+  digitalOf MagazineIssue[] @relation("IssueDigitalPdf")
+
+  @@index([kind])
+}
+
+/// One magazine issue: the Phase 1 catalog product (REQ-010 … REQ-014, REQ-048).
+///
+/// Money is stored as an integer number of **Rial** (`priceIrr`); no floating
+/// point value is ever used for a price. `year`, `season` and `topic` are the
+/// archive facets from DEC-017 and are filled by the admin per issue.
+model MagazineIssue {
+  id               String       @id @default(cuid())
+  issueNumber      Int          @unique
+  title            String
+  slug             String       @unique
+  publicationDate  DateTime
+  description      String?
+  /// Ordered table-of-contents entries: `[{ "title": string, "page": number? }]`.
+  tableOfContents  Json?
+  priceIrr         Int
+  stock            Int          @default(0)
+  status           IssueStatus  @default(DRAFT)
+  /// At most one row may carry `true`; the catalog service enforces it inside a
+  /// transaction guarded by a PostgreSQL advisory lock.
+  isCurrent        Boolean      @default(false)
+  year             Int
+  season           IssueSeason?
+  topic            String?
+  /// Per-issue override for the preview page limit (DEC-006 is unsigned).
+  previewPageLimit Int?
+  publishedAt      DateTime?
+  archivedAt       DateTime?
+
+  coverAssetId      String?
+  coverAsset        MediaAsset? @relation("IssueCover", fields: [coverAssetId], references: [id], onDelete: SetNull)
+  previewPdfAssetId String?
+  previewPdfAsset   MediaAsset? @relation("IssuePreviewPdf", fields: [previewPdfAssetId], references: [id], onDelete: SetNull)
+  /// Reserved for REQ-015 (entitled download). Nothing serves this file on Day 3.
+  digitalPdfAssetId String?
+  digitalPdfAsset   MediaAsset? @relation("IssueDigitalPdf", fields: [digitalPdfAssetId], references: [id], onDelete: SetNull)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([status, issueNumber])
+  @@index([status, publicationDate])
+  @@index([publicationDate])
+  @@index([isCurrent])
+  @@index([year])
+  @@index([season])
+  @@index([topic])
+  @@index([status, year, season])
 }

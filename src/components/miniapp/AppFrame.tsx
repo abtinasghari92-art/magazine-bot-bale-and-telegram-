@@ -6,6 +6,7 @@ import type { ReactNode } from "react";
 
 const NAV = [
   { href: "/miniapp", label: "خانه" },
+  { href: "/miniapp/archive", label: "آرشیو" },
   { href: "/miniapp/profile", label: "حساب من" },
   { href: "/miniapp/addresses", label: "نشانی‌ها" },
 ] as const;

@@ -1,21 +1,41 @@
 const SECRET_PATTERN =
   /token|secret|password|authorization|api[_-]?key|database_url|access[_-]?key|private[_-]?key|credential/i;
 
+/** `scheme://user:password@host` — Prisma puts the whole DSN in some messages. */
+const URL_CREDENTIALS_PATTERN = /([a-z][a-z0-9+.-]*:\/\/)([^\s/@:]+):([^\s/@]*)@/gi;
+
 function redactValue(key: string, value: unknown): unknown {
   if (SECRET_PATTERN.test(key)) {
     return "[redacted]";
   }
-  if (typeof value === "string" && SECRET_PATTERN.test(value)) {
-    return "[redacted]";
+  if (typeof value === "string") {
+    if (SECRET_PATTERN.test(value)) return "[redacted]";
+    return redactSecretsInText(value);
   }
   return value;
 }
 
-function serializeUnknown(error: unknown): string {
+/**
+ * Strip embedded credentials from free text before it reaches the log stream.
+ * Server logs are allowed to carry internal detail (REQ-072 keeps secrets out).
+ */
+export function redactSecretsInText(text: string): string {
+  return text.replace(URL_CREDENTIALS_PATTERN, "$1$2:[redacted]@");
+}
+
+function serializeUnknown(error: unknown): Record<string, unknown> {
   if (error instanceof Error) {
-    return error.message;
+    return {
+      name: error.name,
+      message: redactSecretsInText(error.message),
+      stack: error.stack ? redactSecretsInText(error.stack) : undefined,
+      cause:
+        error.cause instanceof Error
+          ? redactSecretsInText(`${error.cause.name}: ${error.cause.message}`)
+          : undefined,
+    };
   }
-  return "unknown error";
+  return { name: "unknown", message: "unknown error" };
 }
 
 export const logger = {
