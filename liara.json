@@ -1,6 +1,9 @@
 {
   "platform": "next",
   "port": 3000,
+  "build": {
+    "location": "germany"
+  },
   "next": {
     "modifyConfig": false,
     "nodeVersion": "20"
