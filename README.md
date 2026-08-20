@@ -117,6 +117,26 @@ Mini App URL (BotFather → Web App): **https://magazinebot.liara.run/miniapp**
 `TELEGRAM_WEBAPP_SECRET` is unused — Mini App init data is verified with the bot token (HMAC `WebAppData`).  
 `liara.json` marks the platform as Next.js. Never store tokens in git.
 
+### package-lock.json must stay multi-platform
+
+Liara builds on **linux-x64 (glibc)** with `npm ci`, so the lockfile has to contain the Linux
+native binaries (`lightningcss-linux-x64-gnu`, `@tailwindcss/oxide-linux-x64-gnu`,
+`@next/swc-linux-x64-gnu`, …), not only the macOS ones. A lockfile rebuilt from an existing
+macOS `node_modules` keeps just `*-darwin-arm64` and drops every `resolved`/`integrity` field;
+the build then dies with `Cannot find module '../lightningcss.linux-x64-gnu.node'`.
+
+Regenerate it from the registry, never from `node_modules`:
+
+```bash
+rm -rf node_modules package-lock.json && npm install
+```
+
+Sanity check before pushing — both must be non-zero:
+
+```bash
+grep -c '"resolved"' package-lock.json && grep -c 'linux-x64-gnu' package-lock.json
+```
+
 ## Security notes
 
 - No `NEXT_PUBLIC_*` secrets.
