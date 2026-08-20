@@ -93,14 +93,29 @@ If `DATABASE_URL` is missing, generate/validate can still run with the variable 
 
 ## Liara
 
-1. Create a **Next.js** app and a **PostgreSQL** database in Liara.
-2. Attach the database so `DATABASE_URL` is injected (or paste it in the app env).
-3. Set `APP_ENV=production` and `APP_URL` to the public HTTPS origin.
-4. Copy the remaining keys from `.env.example` as those features are built. Never put secrets in git.
-5. Build command: `npm run build`. Start command: `npm start`.
-6. Object Storage (covers/PDFs) is not wired on Day 1; create a bucket later and fill `OBJECT_STORAGE_*`.
+Production app: **https://magazinebot.liara.run**  
+Telegram bot: **@testaraaye1bot**  
+Mini App URL (BotFather → Web App): **https://magazinebot.liara.run/miniapp**
 
-`liara.json` marks the platform as Next.js. Adjust the Liara app name in the dashboard; do not store API tokens in this repo.
+1. Create a **Next.js** app and a **PostgreSQL** database in Liara.
+2. Attach the database so `DATABASE_URL` is injected (use the **public** host, e.g. `*.liara.cloud`, not the internal `*-db` hostname).
+3. In the Liara app **Environment** panel, set at least:
+
+| Variable | Example / notes |
+| --- | --- |
+| `APP_ENV` | `production` |
+| `APP_URL` | `https://magazinebot.liara.run` |
+| `DATABASE_URL` | Public PostgreSQL URI from the Liara DB page |
+| `TELEGRAM_BOT_TOKEN` | From @BotFather — **server-side only** |
+| `TELEGRAM_DEV_AUTH_ENABLED` | `false` |
+| `OTP_REQUIRED` | `false` until DEC-011 is signed |
+
+4. Build command: `npm run build`. Start command: `npm start`.
+5. After deploy, run migrations once (Liara shell or local with public `DATABASE_URL`): `npx prisma migrate deploy`.
+6. Object Storage (covers/PDFs) is not wired yet; create a bucket later and fill `OBJECT_STORAGE_*`.
+
+`TELEGRAM_WEBAPP_SECRET` is unused — Mini App init data is verified with the bot token (HMAC `WebAppData`).  
+`liara.json` marks the platform as Next.js. Never store tokens in git.
 
 ## Security notes
 
