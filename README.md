@@ -111,8 +111,9 @@ Mini App URL (BotFather → Web App): **https://magazinebot.liara.run/miniapp**
 | `OTP_REQUIRED` | `false` until DEC-011 is signed |
 
 4. Build command: `npm run build`. Start command: `npm start`.
-5. After deploy, run migrations once (Liara shell or local with public `DATABASE_URL`): `npx prisma migrate deploy`.
-6. Object Storage (covers/PDFs) is not wired yet; create a bucket later and fill `OBJECT_STORAGE_*`.
+5. `next.config.ts` must include `output: "standalone"` (Liara runtime copies `.next/standalone`).
+6. After deploy, run migrations once (Liara shell or local with public `DATABASE_URL`): `npx prisma migrate deploy`.
+7. Object Storage (covers/PDFs) is not wired yet; create a bucket later and fill `OBJECT_STORAGE_*`.
 
 `TELEGRAM_WEBAPP_SECRET` is unused — Mini App init data is verified with the bot token (HMAC `WebAppData`).  
 `liara.json` marks the platform as Next.js. Never store tokens in git.
